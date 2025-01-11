@@ -37,7 +37,7 @@ class YOPStorage:
                 self._do_upload(file_chunks_generator, dst_file_path)
 
     def download(self, src_file_path: str, dst_dir_path: Optional[str] = None, dst_file_name: Optional[str] = None):
-        if not os.path.exists(dst_dir_path):
+        if dst_dir_path and not os.path.exists(dst_dir_path):
             os.makedirs(dst_dir_path)
 
         src_file_name = os.path.basename(src_file_path)
