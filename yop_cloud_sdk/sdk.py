@@ -9,7 +9,7 @@ DOWNLOAD_CHUNK_SIZE = 8192  # kb
 
 
 def generate_chunks_from_file(file_descriptor, pbar):
-    while chunk := file_descriptor.read(8192):
+    while chunk := file_descriptor.read(DOWNLOAD_CHUNK_SIZE):
         pbar.update(len(chunk))
         yield chunk
 
@@ -21,14 +21,14 @@ class YOPStorage:
 
         self._headers = {}
 
-    def upload(self, src_file_path: str, dst_dir_path: str, dst_file_name: Optional[str] = None):
+    def upload(self, src_file_path: str, dst_dir_path: Optional[str] = None, dst_file_name: Optional[str] = None):
         if not os.path.exists(src_file_path):
             raise RuntimeError(f'File {src_file_path} not found')
         if os.path.isdir(src_file_path):
             raise RuntimeError('Cannot upload directory')
 
         src_dir_path, src_file_name = os.path.split(src_file_path)
-        dst_file_path = os.path.join(dst_dir_path, dst_file_name or src_file_name)
+        dst_file_path = os.path.join(dst_dir_path or '', dst_file_name or src_file_name)
         file_size = os.path.getsize(src_file_path)
 
         with open(src_file_path, 'rb') as src_file:
@@ -36,15 +36,16 @@ class YOPStorage:
                 file_chunks_generator = generate_chunks_from_file(src_file, pbar)
                 self._do_upload(file_chunks_generator, dst_file_path)
 
-    def download(self, src_file_path: str, dst_dir_path: str, dst_file_name: Optional[str] = None):
+    def download(self, src_file_path: str, dst_dir_path: Optional[str] = None, dst_file_name: Optional[str] = None):
         if not os.path.exists(dst_dir_path):
             os.makedirs(dst_dir_path)
 
-        dst_file_path = os.path.join(dst_dir_path, dst_file_name or src_file_path)
+        src_file_name = os.path.basename(src_file_path)
+        dst_file_path = os.path.join(dst_dir_path or '', dst_file_name or src_file_name)
         self._do_download(src_file_path, dst_file_path)
 
     def _do_upload(self, file_chunks_generator: Iterable, dst_file_path: str):
-        url = urljoin(self._host_url, 'upload')
+        url = urljoin(self._host_url, 'upload/')
 
         headers = {**self._headers, 'Content-Disposition': f'attachment; filename="{dst_file_path}"'}
         response = requests.post(url, headers=headers, data=file_chunks_generator, stream=True)
