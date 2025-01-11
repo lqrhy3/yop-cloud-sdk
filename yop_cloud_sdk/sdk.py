@@ -5,7 +5,7 @@ from urllib.parse import urljoin
 import requests
 from tqdm import tqdm
 
-DOWNLOAD_CHUNK_SIZE = 8192  # kb
+DOWNLOAD_CHUNK_SIZE = 64 * 1024  # kb
 
 
 def generate_chunks_from_file(file_descriptor, pbar):
