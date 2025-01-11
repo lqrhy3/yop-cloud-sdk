@@ -1,0 +1,24 @@
+[project]
+name = "yop-cloud-sdk"
+version = "0.0.1"
+authors = [
+  { name="elkyuraytri" },
+  { name="mbappe" },
+  { name="v-tune" },
+]
+description = "An SDK for yop-cloud service"
+readme = "README.md"
+requires-python = ">=3.11"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+
+[project.urls]
+Homepage = "https://github.com/lqrhy3/yop-cloud-sdk"
+Issues = "https://github.com/lqrhy3/yop-cloud-sdk/issues"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
