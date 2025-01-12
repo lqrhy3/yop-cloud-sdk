@@ -21,7 +21,7 @@ class YOPStorage:
         self._host_url = host_url
         self._token = token
 
-        self._headers = {}
+        self._headers = {"Authorization": f"Bearer {self._token}"}
 
     def upload(self, src_file_path: str, dst_file_path: str):
         """
