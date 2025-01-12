@@ -40,7 +40,10 @@ class YOPStorage:
             src_parent_dir_path, src_dir_basename = os.path.split(src_dir_path)
             src_file_path = os.path.join(src_parent_dir_path,  f'.{src_dir_basename}.tar.gz')
             try:
-                subprocess.run(['tar', '-cz', '--no-xattrs', '-f', src_file_path, '-C', src_dir_path, '.'], check=True)
+                subprocess.run(
+                    ['tar', '--disable-copyfile', '-cz', '--no-xattrs', '-f', src_file_path, '-C', src_dir_path, '.'],
+                    check=True
+                )
             except subprocess.CalledProcessError as e:
                 raise RuntimeError(f'Failed to archive folder: {e}')
 
