@@ -3,6 +3,7 @@ from typing import Iterable, Optional
 from urllib.parse import urljoin
 
 import requests
+from requests import Response
 from tqdm import tqdm
 
 DOWNLOAD_CHUNK_SIZE = 64 * 1024  # kb
@@ -22,6 +23,15 @@ class YOPStorage:
         self._headers = {}
 
     def upload(self, src_file_path: str, dst_dir_path: Optional[str] = None, dst_file_name: Optional[str] = None):
+        """
+        Uploads a file to the specified destination directory on the server.
+
+        :param src_file_path: The path to the source file to be uploaded.
+        :param dst_dir_path: The destination directory path on the server. If None, the file will be uploaded to the root directory.
+        :param dst_file_name: The name of the file on the server. If None, the source file name will be used.
+        :raises RuntimeError: If the source file does not exist or is a directory.
+        """
+
         if not os.path.exists(src_file_path):
             raise RuntimeError(f'File {src_file_path} not found')
         if os.path.isdir(src_file_path):
@@ -37,6 +47,15 @@ class YOPStorage:
                 self._do_upload(file_chunks_generator, dst_file_path)
 
     def download(self, src_file_path: str, dst_dir_path: Optional[str] = None, dst_file_name: Optional[str] = None):
+        """
+        Downloads a file from the server to the specified destination directory.
+
+        :param src_file_path: The path to the source file on the server.
+        :param dst_dir_path: The destination directory path on the local machine. If None, the file will be downloaded to the current directory.
+        :param dst_file_name: The name of the file on the local machine. If None, the source file name will be used.
+        :raises FileNotFoundError: If the source file does not exist on the server.
+        :raises Exception: If the download fails for any other reason.
+        """
         if dst_dir_path and not os.path.exists(dst_dir_path):
             os.makedirs(dst_dir_path)
 
@@ -44,7 +63,15 @@ class YOPStorage:
         dst_file_path = os.path.join(dst_dir_path or '', dst_file_name or src_file_name)
         self._do_download(src_file_path, dst_file_path)
 
-    def _do_upload(self, file_chunks_generator: Iterable, dst_file_path: str):
+    def _do_upload(self, file_chunks_generator: Iterable, dst_file_path: str) -> Response:
+        """
+        Handles the actual upload process to the server.
+
+        :param file_chunks_generator: An iterable that yields file chunks to be uploaded.
+        :param dst_file_path: The destination file path on the server.
+        :raises RuntimeError: If the upload fails.
+        :return: The response from the server.
+        """
         url = urljoin(self._host_url, 'upload/')
 
         headers = {**self._headers, 'Content-Disposition': f'attachment; filename="{dst_file_path}"'}
@@ -55,7 +82,16 @@ class YOPStorage:
 
         return response
 
-    def _do_download(self, src_file_path: str, dst_file_path: str):
+    def _do_download(self, src_file_path: str, dst_file_path: str) -> None:
+        """
+        Handles the actual download process from the server.
+
+        :param src_file_path: The path to the source file on the server.
+        :param dst_file_path: The destination file path on the local machine.
+        :raises FileNotFoundError: If the source file does not exist on the server.
+        :raises Exception: If the download fails for any other reason.
+        :return: None
+        """
         url = urljoin(self._host_url, f'download/{src_file_path}')
         response = requests.get(url, headers=self._headers, stream=True)
 
