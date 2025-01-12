@@ -1,6 +1,6 @@
 import os.path
 import subprocess
-from typing import Iterable, Optional
+from typing import Iterable
 from urllib.parse import urljoin
 
 import requests
@@ -40,7 +40,7 @@ class YOPStorage:
             src_parent_dir_path, src_dir_basename = os.path.split(src_dir_path)
             src_file_path = os.path.join(src_parent_dir_path,  f'.{src_dir_basename}.tar.gz')
             try:
-                subprocess.run(['tar', '-czf', src_dir_path, '-C', src_file_path, '.'], check=True)
+                subprocess.run(['tar', '-cz', '--no-xattrs', '-f', src_file_path, '-C', src_dir_path, '.'], check=True)
             except subprocess.CalledProcessError as e:
                 raise RuntimeError(f'Failed to archive folder: {e}')
 
@@ -91,9 +91,11 @@ class YOPStorage:
         :param isdir: Whether uploaded file is archive of a directory
         :return: The response from the server.
         """
-        url = urljoin(self._host_url, 'upload/' if not isdir else 'upload-folder')
+        url = urljoin(self._host_url, 'upload/')
 
         headers = {**self._headers, 'Content-Disposition': f'attachment; filename="{dst_file_path}"'}
+        if isdir:
+            headers['X-Is-Folder'] = 'true'
         response = requests.post(url, headers=headers, data=file_chunks_generator, stream=True)
 
         if response.status_code != 200:
@@ -109,7 +111,11 @@ class YOPStorage:
         :param dst_file_path: The destination file path on the local machine.
         :param isdir: Whether downloaded file is archive of a directory
         """
-        url = urljoin(self._host_url, f'download/{src_file_path}' if not isdir else f'download-folder/{src_file_path}')
+        url = urljoin(self._host_url, f'download/{src_file_path}')
+
+        headers = self._headers
+        if isdir:
+            headers['X-Is-Folder'] = 'true'
         response = requests.get(url, headers=self._headers, stream=True)
 
         if response.status_code == 404:
