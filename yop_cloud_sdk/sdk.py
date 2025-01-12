@@ -70,7 +70,7 @@ class YOPStorage:
         if not os.path.exists(dst_dir_path):
             os.makedirs(dst_dir_path)
 
-        isdir = os.path.isdir(src_file_path)
+        isdir = self._is_file_on_server_dir(src_file_path)
         if isdir:
             dst_dir_path = dst_file_path
             dst_parent_dir_path, dst_dir_basename = os.path.split(dst_dir_path)
@@ -133,3 +133,13 @@ class YOPStorage:
                 for chunk in response.iter_content(chunk_size=DOWNLOAD_CHUNK_SIZE):
                     f.write(chunk)
                     pbar.update(len(chunk))
+
+    def _is_file_on_server_dir(self, src_file_path: str) -> bool:
+        response = self._do_ls(src_file_path)
+        base_name = os.path.basename(src_file_path)
+        return not (len(response.json()) == 1 and base_name == response.json()[0]['file_name'])
+
+    def _do_ls(self, file_path: str) -> Response:
+        url = urljoin(self._host_url, file_path)
+        response = requests.get(url, headers=self._headers)
+        return response
