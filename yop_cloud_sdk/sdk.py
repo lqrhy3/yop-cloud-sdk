@@ -138,6 +138,11 @@ class YOPStorage:
     def _is_file_on_server_dir(self, src_file_path: str) -> bool:
         response = self._do_ls(src_file_path)
         base_name = os.path.basename(src_file_path)
+        if response.status_code == 404:
+            raise FileNotFoundError(f'File "{src_file_path}" not found on server')
+        elif response.status_code != 200:
+            raise Exception(f'Failed to browse file on server: {response.text}')
+
         return not (len(response.json()) == 1 and base_name == response.json()[0]['file_name'])
 
     def _do_ls(self, file_path: str) -> Response:
