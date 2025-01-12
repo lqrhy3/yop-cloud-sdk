@@ -48,7 +48,7 @@ class YOPStorage:
             dst_file_path = dst_dir_path or src_dir_path
 
             try:
-                subprocess.run(['tar', '-czf', src_file_path, src_dir_path], check=True)
+                subprocess.run(['tar', '-czf', src_dir_path, '-C', src_file_path, '.'], check=True)
             except subprocess.CalledProcessError as e:
                 raise RuntimeError(f'Failed to archive folder: {e}')
 
