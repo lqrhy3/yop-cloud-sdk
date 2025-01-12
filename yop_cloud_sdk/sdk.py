@@ -23,30 +23,22 @@ class YOPStorage:
 
         self._headers = {}
 
-    def upload(self, src_file_path: str, dst_dir_path: Optional[str] = None, dst_file_name: Optional[str] = None):
+    def upload(self, src_file_path: str, dst_file_path: str):
         """
         Uploads a file to the specified destination directory on the server.
 
         :param src_file_path: The path to the source file to be uploaded.
-        :param dst_dir_path: The destination directory path on the server. If None, the file will be uploaded to the root directory.
-        :param dst_file_name: The name of the file on the server. If None, the source file name will be used.
-        :raises RuntimeError: If the source file does not exist or is a directory.
+        :param dst_file_path: The path to the destination file on the server.
         """
 
         if not os.path.exists(src_file_path):
             raise RuntimeError(f'File {src_file_path} not found')
 
         isdir = os.path.isdir(src_file_path)
-        if not isdir:
-            src_dir_path, src_file_name = os.path.split(src_file_path)
-            dst_file_path = os.path.join(dst_dir_path or '', dst_file_name or src_file_name)
-        else:
-            if dst_file_name is not None:
-                raise RuntimeError('If folder is uploaded file name must not be specified')
+        if isdir:
             src_dir_path = src_file_path
-            src_file_path = '.' + src_dir_path + '.tar.gz'
-            dst_file_path = dst_dir_path or src_dir_path
-
+            src_parent_dir_path, src_dir_basename = os.path.split(src_dir_path)
+            src_file_path = os.path.join(src_parent_dir_path,  f'.{src_dir_basename}.tar.gz')
             try:
                 subprocess.run(['tar', '-czf', src_dir_path, '-C', src_file_path, '.'], check=True)
             except subprocess.CalledProcessError as e:
@@ -54,28 +46,41 @@ class YOPStorage:
 
         file_size = os.path.getsize(src_file_path)
 
-        with open(src_file_path, 'rb') as src_file:
-            with tqdm(total=file_size, unit='B', unit_scale=True, desc=src_file_path) as pbar:
-                file_chunks_generator = generate_chunks_from_file(src_file, pbar)
-                self._do_upload(file_chunks_generator, dst_file_path, isdir=isdir)
+        try:
+            with open(src_file_path, 'rb') as src_file:
+                with tqdm(total=file_size, unit='B', unit_scale=True, desc=src_file_path) as pbar:
+                    file_chunks_generator = generate_chunks_from_file(src_file, pbar)
+                    self._do_upload(file_chunks_generator, dst_file_path, isdir=isdir)
+        finally:
+            # remove temp folder archive
+            if isdir:
+                os.remove(src_file_path)
 
-    def download(self, src_file_path: str, dst_dir_path: Optional[str] = None, dst_file_name: Optional[str] = None):
+    def download(self, src_file_path: str, dst_file_path: str):
         """
         Downloads a file from the server to the specified destination directory.
 
-        :param src_file_path: The path to the source file on the server.
-        :param dst_dir_path: The destination directory path on the local machine. If None, the file will be downloaded to the current directory.
-        :param dst_file_name: The name of the file on the local machine. If None, the source file name will be used.
-        :raises FileNotFoundError: If the source file does not exist on the server.
-        :raises Exception: If the download fails for any other reason.
+        :param src_file_path: The path to the source file (or folder) on the server.
+        :param dst_file_path: The path to the destination file (or folder) on the local machine.
         """
-        if dst_dir_path and not os.path.exists(dst_dir_path):
+        dst_dir_path, dst_file_name = os.path.split(dst_file_path)
+        if not os.path.exists(dst_dir_path):
             os.makedirs(dst_dir_path)
 
-        # TODO: folder download
-        src_file_name = os.path.basename(src_file_path)
-        dst_file_path = os.path.join(dst_dir_path or '', dst_file_name or src_file_name)
-        self._do_download(src_file_path, dst_file_path)
+        isdir = os.path.isdir(src_file_path)
+        if isdir:
+            dst_dir_path = dst_file_path
+            dst_parent_dir_path, dst_dir_basename = os.path.split(dst_dir_path)
+            dst_file_path = os.path.join(dst_parent_dir_path, f'.{dst_dir_basename}.tar.gz')
+
+        self._do_download(src_file_path, dst_file_path, isdir)
+        if isdir:
+            try:
+                subprocess.run(['tar', '-xf', dst_file_path, '-C', dst_dir_path], check=True)
+            except subprocess.CalledProcessError as e:
+                raise RuntimeError(f'Failed to unzip folder: {e}')
+            finally:
+                os.remove(dst_file_path)
 
     def _do_upload(self, file_chunks_generator: Iterable, dst_file_path: str, isdir: bool) -> Response:
         """
@@ -83,7 +88,7 @@ class YOPStorage:
 
         :param file_chunks_generator: An iterable that yields file chunks to be uploaded.
         :param dst_file_path: The destination file path on the server.
-        :raises RuntimeError: If the upload fails.
+        :param isdir: Whether uploaded file is archive of a directory
         :return: The response from the server.
         """
         url = urljoin(self._host_url, 'upload/' if not isdir else 'upload-folder')
@@ -96,17 +101,15 @@ class YOPStorage:
 
         return response
 
-    def _do_download(self, src_file_path: str, dst_file_path: str) -> None:
+    def _do_download(self, src_file_path: str, dst_file_path: str, isdir: bool) -> None:
         """
         Handles the actual download process from the server.
 
         :param src_file_path: The path to the source file on the server.
         :param dst_file_path: The destination file path on the local machine.
-        :raises FileNotFoundError: If the source file does not exist on the server.
-        :raises Exception: If the download fails for any other reason.
-        :return: None
+        :param isdir: Whether downloaded file is archive of a directory
         """
-        url = urljoin(self._host_url, f'download/{src_file_path}')
+        url = urljoin(self._host_url, f'download/{src_file_path}' if not isdir else f'download-folder/{src_file_path}')
         response = requests.get(url, headers=self._headers, stream=True)
 
         if response.status_code == 404:
