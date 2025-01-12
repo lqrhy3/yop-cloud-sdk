@@ -67,14 +67,15 @@ class YOPStorage:
         :param dst_file_path: The path to the destination file (or folder) on the local machine.
         """
         dst_dir_path, dst_file_name = os.path.split(dst_file_path)
-        if not os.path.exists(dst_dir_path):
-            os.makedirs(dst_dir_path)
 
         isdir = self._is_file_on_server_dir(src_file_path)
         if isdir:
             dst_dir_path = dst_file_path
             dst_parent_dir_path, dst_dir_basename = os.path.split(dst_dir_path)
             dst_file_path = os.path.join(dst_parent_dir_path, f'.{dst_dir_basename}.tar.gz')
+
+        if dst_dir_path and not os.path.exists(dst_dir_path):
+            os.makedirs(dst_dir_path)
 
         self._do_download(src_file_path, dst_file_path, isdir)
         if isdir:
