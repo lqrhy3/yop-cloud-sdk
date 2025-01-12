@@ -72,6 +72,7 @@ class YOPStorage:
         if dst_dir_path and not os.path.exists(dst_dir_path):
             os.makedirs(dst_dir_path)
 
+        # TODO: folder download
         src_file_name = os.path.basename(src_file_path)
         dst_file_path = os.path.join(dst_dir_path or '', dst_file_name or src_file_name)
         self._do_download(src_file_path, dst_file_path)
