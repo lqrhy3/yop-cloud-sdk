@@ -1,4 +1,5 @@
 import os.path
+import subprocess
 from typing import Iterable, Optional
 from urllib.parse import urljoin
 
@@ -34,17 +35,29 @@ class YOPStorage:
 
         if not os.path.exists(src_file_path):
             raise RuntimeError(f'File {src_file_path} not found')
-        if os.path.isdir(src_file_path):
-            raise RuntimeError('Cannot upload directory')
 
-        src_dir_path, src_file_name = os.path.split(src_file_path)
-        dst_file_path = os.path.join(dst_dir_path or '', dst_file_name or src_file_name)
+        isdir = os.path.isdir(src_file_path)
+        if not isdir:
+            src_dir_path, src_file_name = os.path.split(src_file_path)
+            dst_file_path = os.path.join(dst_dir_path or '', dst_file_name or src_file_name)
+        else:
+            if dst_file_name is not None:
+                raise RuntimeError('If folder is uploaded file name must not be specified')
+            src_dir_path = src_file_path
+            src_file_path = '.' + src_dir_path + '.tar.gz'
+            dst_file_path = dst_dir_path or src_dir_path
+
+            try:
+                subprocess.run(['tar', '-czf', src_file_path, src_dir_path], check=True)
+            except subprocess.CalledProcessError as e:
+                raise RuntimeError(f'Failed to archive folder: {e}')
+
         file_size = os.path.getsize(src_file_path)
 
         with open(src_file_path, 'rb') as src_file:
             with tqdm(total=file_size, unit='B', unit_scale=True, desc=src_file_path) as pbar:
                 file_chunks_generator = generate_chunks_from_file(src_file, pbar)
-                self._do_upload(file_chunks_generator, dst_file_path)
+                self._do_upload(file_chunks_generator, dst_file_path, isdir=isdir)
 
     def download(self, src_file_path: str, dst_dir_path: Optional[str] = None, dst_file_name: Optional[str] = None):
         """
@@ -63,7 +76,7 @@ class YOPStorage:
         dst_file_path = os.path.join(dst_dir_path or '', dst_file_name or src_file_name)
         self._do_download(src_file_path, dst_file_path)
 
-    def _do_upload(self, file_chunks_generator: Iterable, dst_file_path: str) -> Response:
+    def _do_upload(self, file_chunks_generator: Iterable, dst_file_path: str, isdir: bool) -> Response:
         """
         Handles the actual upload process to the server.
 
@@ -72,7 +85,7 @@ class YOPStorage:
         :raises RuntimeError: If the upload fails.
         :return: The response from the server.
         """
-        url = urljoin(self._host_url, 'upload/')
+        url = urljoin(self._host_url, 'upload/' if not isdir else 'upload-folder')
 
         headers = {**self._headers, 'Content-Disposition': f'attachment; filename="{dst_file_path}"'}
         response = requests.post(url, headers=headers, data=file_chunks_generator, stream=True)
