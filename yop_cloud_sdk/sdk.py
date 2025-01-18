@@ -95,6 +95,13 @@ class YOPStorage:
         self._do_delete(file_path)
 
     def _do_delete(self, file_path: str) -> Response:
+        """
+        Handles the actual delete process from the server.
+
+        :param file_path: The file path for deleting on the server.
+        :return: The response from the server.
+        """
+
         url = urljoin(self._host_url, f'delete/{file_path}')
 
         headers = self._headers
@@ -104,7 +111,6 @@ class YOPStorage:
         elif response.status_code != 204:
             raise Exception(f'Failed to delete file: {response.status_code} {response.text}')
         return response
-
 
     def _do_upload(self, file_chunks_generator: Iterable, dst_file_path: str, isdir: bool) -> Response:
         """
