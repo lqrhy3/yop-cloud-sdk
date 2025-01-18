@@ -6,6 +6,7 @@ from urllib.parse import urljoin
 import requests
 from requests import Response
 from tqdm import tqdm
+from tabulate import tabulate
 
 DOWNLOAD_CHUNK_SIZE = 64 * 1024  # kb
 
@@ -14,6 +15,13 @@ def generate_chunks_from_file(file_descriptor, pbar):
     while chunk := file_descriptor.read(DOWNLOAD_CHUNK_SIZE):
         pbar.update(len(chunk))
         yield chunk
+
+
+def print_ls(list_files):
+    table = []
+    for file in list_files:
+        table.append([file['name'], file['type'], file['size_human']])
+    print(tabulate(table, headers=['Name', 'Type', 'Size'], tablefmt='pretty'))
 
 
 class YOPStorage:
@@ -94,16 +102,17 @@ class YOPStorage:
         """
         self._do_delete(file_path)
 
-    def list_files(self, list_path: str):
+    def list_files(self, list_path: str, verbose: bool = False) -> list[dict]:
         """
         Lists files on the server by the specified path.
+        :param verbose: If True, prints the list of files.
         :param list_path: The path to be listed on the server.
         """
         response = self._do_list_files(list_path)
-
-        # TODO: Change processing response
-        for file in response.json():
-            print(file)
+        list_files = response.json()
+        if verbose:
+            print_ls(list_files)
+        return list_files
 
     def _do_delete(self, file_path: str) -> Response:
         """
