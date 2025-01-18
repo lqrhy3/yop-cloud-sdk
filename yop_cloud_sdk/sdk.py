@@ -94,6 +94,17 @@ class YOPStorage:
         """
         self._do_delete(file_path)
 
+    def list_files(self, list_path: str):
+        """
+        Lists files on the server by the specified path.
+        :param list_path: The path to be listed on the server.
+        """
+        response = self._do_list_files(list_path)
+
+        # TODO: Change processing response
+        for file in response.json():
+            print(file)
+
     def _do_delete(self, file_path: str) -> Response:
         """
         Handles the actual delete process from the server.
@@ -162,16 +173,27 @@ class YOPStorage:
                     pbar.update(len(chunk))
 
     def _is_file_on_server_dir(self, src_file_path: str) -> bool:
-        response = self._do_ls(src_file_path)
+        response = self._do_list_files(src_file_path)
         base_name = os.path.basename(src_file_path)
         if response.status_code == 404:
             raise FileNotFoundError(f'File "{src_file_path}" not found on server')
         elif response.status_code != 200:
             raise Exception(f'Failed to browse file on server: {response.text}')
 
-        return not (len(response.json()) == 1 and base_name == response.json()[0]['file_name'])
+        return not (len(response.json()) == 1 and base_name == response.json()[0]['name'])
 
-    def _do_ls(self, file_path: str) -> Response:
-        url = urljoin(self._host_url, file_path)
+    def _do_list_files(self, list_path: str) -> Response:
+        """
+        Handles the actual ls (list_files) process on the server.
+        :param list_path: The path to the directory for listing files.
+        :return:
+        """
+        url = urljoin(self._host_url, f'ls/{list_path}')
         response = requests.get(url, headers=self._headers)
+        if response.status_code == 404:
+            raise FileNotFoundError(f'File "{list_path}" not found on server')
+        elif response.status_code != 200:
+            raise Exception(f'Failed to browse files on server: {response.text}')
+
         return response
+
