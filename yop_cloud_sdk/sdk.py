@@ -86,6 +86,26 @@ class YOPStorage:
             finally:
                 os.remove(dst_file_path)
 
+    def delete(self, file_path: str):
+        """
+        Deletes a file from the server.
+
+        :param file_path: The path to the file on the server.
+        """
+        self._do_delete(file_path)
+
+    def _do_delete(self, file_path: str) -> Response:
+        url = urljoin(self._host_url, f'delete/{file_path}')
+
+        headers = self._headers
+        response = requests.delete(url, headers=headers)
+        if response.status_code == 404:
+            raise FileNotFoundError(f'File "{file_path}" not found on server')
+        elif response.status_code != 204:
+            raise Exception(f'Failed to delete file: {response.status_code} {response.text}')
+        return response
+
+
     def _do_upload(self, file_chunks_generator: Iterable, dst_file_path: str, isdir: bool) -> Response:
         """
         Handles the actual upload process to the server.
