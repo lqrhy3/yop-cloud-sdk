@@ -20,7 +20,7 @@ def generate_chunks_from_file(file_descriptor, pbar):
 def print_ls(list_files):
     table = []
     for file in list_files:
-        table.append([file['name'], file['type'], file['size_human']])
+        table.append([file.get('name'), file.get('type'), file.get('size_human')])
     print(tabulate(table, headers=['Name', 'Type', 'Size'], tablefmt='pretty'))
 
 
@@ -108,15 +108,16 @@ class YOPStorage:
         """
         self._do_delete(file_path)
 
-    def list_files(self, list_path: str, verbose: bool = False) -> list[dict]:
+    def list_files(self, list_path: str, print_result: bool = False, verbose: bool = False) -> list[dict]:
         """
         Lists files on the server by the specified path.
-        :param verbose: If True, prints the list of files.
+        :param print_result: If True, prints the list of files.
         :param list_path: The path to be listed on the server.
+        :param verbose: If True, return with list of files their sizes.
         """
-        response = self._do_list_files(list_path)
+        response = self._do_list_files(list_path=list_path, verbose=verbose)
         list_files = response.json()
-        if verbose:
+        if print_result:
             print_ls(list_files)
         return list_files
 
@@ -174,7 +175,8 @@ class YOPStorage:
 
             if pre_request.status_code >= 400:
                 raise RuntimeError(
-                    f'Upload failed: {pre_request.status_code} {pre_request.text}')
+                    f'Upload failed: {pre_request.status_code} {pre_request.text}'
+                )
 
             response = session.post(
                 url, headers=headers, data=file_chunks_generator, stream=True
@@ -214,7 +216,7 @@ class YOPStorage:
                     pbar.update(len(chunk))
 
     def _is_file_on_server_dir(self, src_file_path: str) -> bool:
-        response = self._do_list_files(src_file_path)
+        response = self._do_list_files(src_file_path, verbose=False)
         base_name = os.path.basename(src_file_path)
         if response.status_code == 404:
             raise FileNotFoundError(f'File "{src_file_path}" not found on server')
@@ -223,13 +225,14 @@ class YOPStorage:
 
         return not (len(response.json()) == 1 and base_name == response.json()[0]['name'])
 
-    def _do_list_files(self, list_path: str) -> Response:
+    def _do_list_files(self, list_path: str, verbose: bool) -> Response:
         """
         Handles the actual ls (list_files) process on the server.
         :param list_path: The path to the directory for listing files.
+        :param verbose: If True, return with list of files their sizes.
         :return:
         """
-        url = urljoin(self._host_url, f'ls/{list_path}')
+        url = urljoin(self._host_url, f'ls/{list_path}/?verbose={str(verbose).lower()}')
         response = requests.get(url, headers=self._headers)
         if response.status_code == 404:
             raise FileNotFoundError(f'File "{list_path}" not found on server')
