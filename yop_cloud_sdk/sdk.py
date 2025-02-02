@@ -6,6 +6,7 @@ from urllib.parse import urljoin
 import requests
 from requests import Response
 from tqdm import tqdm
+from tabulate import tabulate
 
 DOWNLOAD_CHUNK_SIZE = 64 * 1024  # kb
 
@@ -14,6 +15,13 @@ def generate_chunks_from_file(file_descriptor, pbar):
     while chunk := file_descriptor.read(DOWNLOAD_CHUNK_SIZE):
         pbar.update(len(chunk))
         yield chunk
+
+
+def print_ls(list_files):
+    table = []
+    for file in list_files:
+        table.append([file['name'], file['type'], file['size_human']])
+    print(tabulate(table, headers=['Name', 'Type', 'Size'], tablefmt='pretty'))
 
 
 class YOPStorage:
@@ -86,6 +94,44 @@ class YOPStorage:
             finally:
                 os.remove(dst_file_path)
 
+    def delete(self, file_path: str):
+        """
+        Deletes a file from the server.
+
+        :param file_path: The path to the file on the server.
+        """
+        self._do_delete(file_path)
+
+    def list_files(self, list_path: str, verbose: bool = False) -> list[dict]:
+        """
+        Lists files on the server by the specified path.
+        :param verbose: If True, prints the list of files.
+        :param list_path: The path to be listed on the server.
+        """
+        response = self._do_list_files(list_path)
+        list_files = response.json()
+        if verbose:
+            print_ls(list_files)
+        return list_files
+
+    def _do_delete(self, file_path: str) -> Response:
+        """
+        Handles the actual delete process from the server.
+
+        :param file_path: The file path for deleting on the server.
+        :return: The response from the server.
+        """
+
+        url = urljoin(self._host_url, f'delete/{file_path}')
+
+        headers = self._headers
+        response = requests.delete(url, headers=headers)
+        if response.status_code == 404:
+            raise FileNotFoundError(f'File "{file_path}" not found on server')
+        elif response.status_code != 204:
+            raise Exception(f'Failed to delete file: {response.status_code} {response.text}')
+        return response
+
     def _do_upload(self, file_chunks_generator: Iterable, dst_file_path: str, isdir: bool) -> Response:
         """
         Handles the actual upload process to the server.
@@ -152,7 +198,7 @@ class YOPStorage:
                     pbar.update(len(chunk))
 
     def _is_file_on_server_dir(self, src_file_path: str) -> bool:
-        response = self._do_ls(src_file_path)
+        response = self._do_list_files(src_file_path)
         base_name = os.path.basename(src_file_path)
         if response.status_code == 404:
             raise FileNotFoundError(f'File "{src_file_path}" not found on server')
@@ -161,7 +207,18 @@ class YOPStorage:
 
         return not (len(response.json()) == 1 and base_name == response.json()[0]['name'])
 
-    def _do_ls(self, file_path: str) -> Response:
-        url = urljoin(self._host_url, f'ls/{file_path}')
+    def _do_list_files(self, list_path: str) -> Response:
+        """
+        Handles the actual ls (list_files) process on the server.
+        :param list_path: The path to the directory for listing files.
+        :return:
+        """
+        url = urljoin(self._host_url, f'ls/{list_path}')
         response = requests.get(url, headers=self._headers)
+        if response.status_code == 404:
+            raise FileNotFoundError(f'File "{list_path}" not found on server')
+        elif response.status_code != 200:
+            raise Exception(f'Failed to browse files on server: {response.text}')
+
         return response
+
