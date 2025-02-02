@@ -97,15 +97,31 @@ class YOPStorage:
         """
         url = urljoin(self._host_url, 'upload/')
 
-        headers = {**self._headers, 'Content-Disposition': f'attachment; filename="{dst_file_path}"'}
+        headers = {
+            **self._headers,
+            'Content-Disposition': f'attachment; filename="{dst_file_path}"'
+        }
         if isdir:
-            headers['X-Is-Folder'] = 'true'
-        response = requests.post(url, headers=headers, data=file_chunks_generator, stream=True)
+            headers['X-Is-Archive'] = 'true'
 
-        if response.status_code != 200:
-            raise RuntimeError(f'Upload failed: {response.status_code} {response.text}')
+        with requests.Session() as session:
+            # Check headers only aka "expect: 100-continue"
+            pre_request = session.post(
+                url, headers=headers, stream=True
+            )
 
-        return response
+            if pre_request.status_code >= 400:
+                raise RuntimeError(
+                    f'Upload failed early: {pre_request.status_code} {pre_request.text}')
+
+            response = session.post(
+                url, headers=headers, data=file_chunks_generator, stream=True
+            )
+
+            if response.status_code != 200:
+                raise RuntimeError(f'Upload failed: {response.status_code} {response.text}')
+
+            return response
 
     def _do_download(self, src_file_path: str, dst_file_path: str, isdir: bool) -> None:
         """
@@ -119,7 +135,7 @@ class YOPStorage:
 
         headers = self._headers
         if isdir:
-            headers['X-Is-Folder'] = 'true'
+            headers['X-Is-Archive'] = 'true'
         response = requests.get(url, headers=self._headers, stream=True)
 
         if response.status_code == 404:
@@ -143,9 +159,9 @@ class YOPStorage:
         elif response.status_code != 200:
             raise Exception(f'Failed to browse file on server: {response.text}')
 
-        return not (len(response.json()) == 1 and base_name == response.json()[0]['file_name'])
+        return not (len(response.json()) == 1 and base_name == response.json()[0]['name'])
 
     def _do_ls(self, file_path: str) -> Response:
-        url = urljoin(self._host_url, file_path)
+        url = urljoin(self._host_url, f'ls/{file_path}')
         response = requests.get(url, headers=self._headers)
         return response
