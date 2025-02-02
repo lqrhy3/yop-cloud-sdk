@@ -163,7 +163,7 @@ class YOPStorage:
             # Check headers only aka "expect: 100-continue"
             pre_request = session.post(
                 url,
-                headers={**headers, 'Expect': '100-continue'},
+                headers={**headers, 'X-Expect': '100-continue'},
                 stream=True  # TODO: why stream
             )
 
