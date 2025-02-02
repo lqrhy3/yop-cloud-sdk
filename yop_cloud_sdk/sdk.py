@@ -31,7 +31,7 @@ class YOPStorage:
 
         self._headers = {"Authorization": f"Bearer {self._token}"}
 
-    def upload(self, src_file_path: str, dst_file_path: str):
+    def upload(self, src_file_path: str, dst_file_path: str, force: bool = False):
         """
         Uploads a file to the specified destination directory on the server.
 
@@ -62,7 +62,11 @@ class YOPStorage:
                 with tqdm(total=file_size, unit='B', unit_scale=True, desc=src_file_path) as pbar:
                     file_chunks_generator = generate_chunks_from_file(src_file, pbar)
                     self._do_upload(
-                        file_chunks_generator, dst_file_path, isdir=isdir, file_size=file_size
+                        file_chunks_generator=file_chunks_generator,
+                        dst_file_path=dst_file_path,
+                        isdir=isdir,
+                        file_size=file_size,
+                        force=force
                     )
         finally:
             # remove temp folder archive
@@ -140,6 +144,7 @@ class YOPStorage:
             dst_file_path: str,
             isdir: bool,
             file_size: int,
+            force: bool,
     ) -> Response:
         """
         Handles the actual upload process to the server.
@@ -149,7 +154,7 @@ class YOPStorage:
         :param isdir: Whether uploaded file is archive of a directory
         :return: The response from the server.
         """
-        url = urljoin(self._host_url, 'upload/')
+        url = urljoin(self._host_url, f'upload/?force={str(force).lower()}')
 
         headers = {
             **self._headers,
