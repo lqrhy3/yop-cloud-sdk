@@ -61,7 +61,9 @@ class YOPStorage:
             with open(src_file_path, 'rb') as src_file:
                 with tqdm(total=file_size, unit='B', unit_scale=True, desc=src_file_path) as pbar:
                     file_chunks_generator = generate_chunks_from_file(src_file, pbar)
-                    self._do_upload(file_chunks_generator, dst_file_path, isdir=isdir)
+                    self._do_upload(
+                        file_chunks_generator, dst_file_path, isdir=isdir, file_size=file_size
+                    )
         finally:
             # remove temp folder archive
             if isdir:
@@ -132,7 +134,13 @@ class YOPStorage:
             raise Exception(f'Failed to delete file: {response.status_code} {response.text}')
         return response
 
-    def _do_upload(self, file_chunks_generator: Iterable, dst_file_path: str, isdir: bool) -> Response:
+    def _do_upload(
+            self,
+            file_chunks_generator: Iterable,
+            dst_file_path: str,
+            isdir: bool,
+            file_size: int,
+    ) -> Response:
         """
         Handles the actual upload process to the server.
 
@@ -145,7 +153,8 @@ class YOPStorage:
 
         headers = {
             **self._headers,
-            'Content-Disposition': f'attachment; filename="{dst_file_path}"'
+            'Content-Disposition': f'attachment; filename="{dst_file_path}"',
+            'X-File-Size': str(file_size),
         }
         if isdir:
             headers['X-Is-Archive'] = 'true'
@@ -153,12 +162,14 @@ class YOPStorage:
         with requests.Session() as session:
             # Check headers only aka "expect: 100-continue"
             pre_request = session.post(
-                url, headers=headers, stream=True
+                url,
+                headers={**headers, 'Expect': '100-continue'},
+                stream=True  # TODO: why stream
             )
 
             if pre_request.status_code >= 400:
                 raise RuntimeError(
-                    f'Upload failed early: {pre_request.status_code} {pre_request.text}')
+                    f'Upload failed: {pre_request.status_code} {pre_request.text}')
 
             response = session.post(
                 url, headers=headers, data=file_chunks_generator, stream=True
